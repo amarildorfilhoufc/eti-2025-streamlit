@@ -82,7 +82,14 @@ else:
     with tab2:
         top_cidades = df_filtrado['cidade'].value_counts().nlargest(10)
         fig, ax = plt.subplots(figsize=(10, 5))
-        sns.barplot(x=top_cidades.values, y=top_cidades.index, palette="Blues_d", ax=ax)
+        sns.barplot(
+            x=top_cidades.values,
+            y=top_cidades.index,
+            hue=top_cidades.index,  # define hue explicitamente
+            palette="Blues_d",
+            ax=ax,
+            legend=False  # evita exibir legenda desnecessária
+        )
         ax.set_title('Top 10 Cidades')
         ax.set_xlabel('Quantidade')
         ax.set_ylabel('Cidade')
@@ -138,26 +145,48 @@ else:
                     st.markdown("---")
 
     with tab5:
+       
         st.markdown("### 🏙️ Cidades com Maior % de 'Nunca Acessou'")
 
-        cidade_estado = df_filtrado.groupby(['cidade', 'estado', 'acesso']).size().unstack(fill_value=0)
+        # Filtro por estado
+        estados_disponiveis = sorted(df_filtrado['estado'].dropna().unique())
+        estados_selecionados = st.multiselect("Selecione o(s) Estado(s):", estados_disponiveis, default=estados_disponiveis)
 
-        if 'nunca acessou' in cidade_estado.columns:
-            cidade_estado['percentual_nunca_acessou'] = (
-                cidade_estado['nunca acessou'] / cidade_estado.sum(axis=1)
-            ) * 100
+        # Filtra o DataFrame com base nos estados selecionados
+        df_estado_filtrado = df_filtrado[df_filtrado['estado'].isin(estados_selecionados)]
 
-            cidades_ordenadas = cidade_estado['percentual_nunca_acessou'].sort_values(ascending=False).reset_index()
-            cidades_ordenadas = cidades_ordenadas[['cidade', 'estado', 'percentual_nunca_acessou']].rename(columns={
-                'cidade': 'Cidade',
-                'estado': 'Estado',
-                'percentual_nunca_acessou': '% Nunca Acessou'
-            })
+        # Agrupamento por cidade, estado e acesso
+        cidade_estado = df_estado_filtrado.groupby(['cidade', 'estado', 'acesso']).size().unstack(fill_value=0)
 
-            st.dataframe(cidades_ordenadas.head(20), use_container_width=True)
+        # Normalizando os nomes das colunas de acesso
+        colunas = [col.lower() for col in cidade_estado.columns]
+        cidade_estado.columns = colunas
 
-        else:
-            st.info("Nenhuma informação disponível sobre 'nunca acessou'.")
+        # Pegando valores corretamente mesmo que falte alguma categoria
+        ja_acessou = cidade_estado.get('já acessou', 0)
+        nunca_acessou = cidade_estado.get('nunca acessou', 0)
+
+        # Cálculo das colunas
+        cidade_estado['Já Acessou'] = ja_acessou
+        cidade_estado['Nunca Acessou'] = nunca_acessou
+        cidade_estado['Total de Registros'] = ja_acessou + nunca_acessou
+        cidade_estado['% Nunca Acessou'] = (nunca_acessou / cidade_estado['Total de Registros']) * 100
+
+        # Organização final
+        cidades_ordenadas = cidade_estado[['% Nunca Acessou', 'Já Acessou', 'Total de Registros']].sort_values(
+            by='% Nunca Acessou', ascending=False
+        ).reset_index()
+
+        cidades_ordenadas = cidades_ordenadas.rename(columns={
+            'cidade': 'Cidade',
+            'estado': 'Estado'
+        })
+
+        st.dataframe(cidades_ordenadas.head(100), use_container_width=True)
+
+
+
+
 
     st.divider()
     st.subheader("📋 Dados Filtrados")
