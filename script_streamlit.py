@@ -25,16 +25,30 @@ except Exception as e:
     st.stop()
 
 # Sidebar - Filtros
-st.sidebar.title("Filtros")
-with st.sidebar:
-    estado_selecionado = st.multiselect("Estado", options=estados_validos, placeholder="Selecione estados...")
-    cidade_selecionada = st.multiselect("Cidade", options=sorted(df['cidade'].dropna().unique()), placeholder="Selecione cidades...")
-    status_acesso = st.multiselect("Status de Acesso", options=sorted(df['acesso'].dropna().unique()), placeholder="Selecione status...")
+st.sidebar.title("🎛️ Filtros")
+estado_selecionado = st.sidebar.multiselect("Estado", options=estados_validos, placeholder="Selecione estados...")
+cidade_selecionada = st.sidebar.multiselect("Cidade", options=sorted(df['cidade'].dropna().unique()), placeholder="Selecione cidades...")
+status_acesso = st.sidebar.multiselect("Status de Acesso", options=sorted(df['acesso'].dropna().unique()), placeholder="Selecione status...")
 
-    if st.button("🔄 Limpar Filtros"):
-        estado_selecionado = []
-        cidade_selecionada = []
-        status_acesso = []
+if st.sidebar.button("🔄 Limpar Filtros"):
+    estado_selecionado = []
+    cidade_selecionada = []
+    status_acesso = []
+
+# Campo de busca por nome
+st.sidebar.markdown("---")
+nome_busca = st.sidebar.text_input("🔍 Buscar Aluno por Nome", placeholder="Digite o nome...")
+
+# Menu lateral de navegação
+menu = st.sidebar.radio("📁 Navegação", [
+    "📌 Visão Geral", 
+    "🏙️ Por Cidade", 
+    "📈 Detalhado", 
+    "📚 Por Turma e Estado", 
+    "📉 Menores Acessos",
+    "👥 Alocação por Turma", 
+    "🔍 Buscar por Nome"
+])
 
 # Aplicar filtros
 filtro_estado = df['estado'].isin(estado_selecionado) if estado_selecionado else pd.Series([True] * len(df))
@@ -44,7 +58,7 @@ filtro_acesso = df['acesso'].isin(status_acesso) if status_acesso else pd.Series
 # Dados filtrados
 df_filtrado = df[filtro_estado & filtro_cidade & filtro_acesso]
 
-# Título
+# Título principal
 st.title("📊 Dashboard de Acessos")
 
 if df_filtrado.empty:
@@ -60,15 +74,7 @@ else:
 
     st.divider()
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📌 Visão Geral", 
-        "🏙️ Por Cidade", 
-        "📈 Detalhado", 
-        "📚 Por Turma e Estado", 
-        "📉 Menores Acessos"
-    ])
-
-    with tab1:
+    if menu == "📌 Visão Geral":
         fig, ax = plt.subplots(figsize=(10, 5))
         sns.countplot(data=df_filtrado, y='estado', order=df_filtrado['estado'].value_counts().index, ax=ax)
         ax.set_title('Distribuição por Estado')
@@ -79,16 +85,16 @@ else:
             ax.text(width + 1, p.get_y() + p.get_height()/2, f'{int(width)}', ha='left', va='center')
         st.pyplot(fig)
 
-    with tab2:
+    elif menu == "🏙️ Por Cidade":
         top_cidades = df_filtrado['cidade'].value_counts().nlargest(10)
         fig, ax = plt.subplots(figsize=(10, 5))
         sns.barplot(
             x=top_cidades.values,
             y=top_cidades.index,
-            hue=top_cidades.index,  # define hue explicitamente
+            hue=top_cidades.index,
             palette="Blues_d",
             ax=ax,
-            legend=False  # evita exibir legenda desnecessária
+            legend=False
         )
         ax.set_title('Top 10 Cidades')
         ax.set_xlabel('Quantidade')
@@ -97,7 +103,7 @@ else:
             ax.text(v + 0.5, i, str(v), color='black', va='center')
         st.pyplot(fig)
 
-    with tab3:
+    elif menu == "📈 Detalhado":
         cross_tab = pd.crosstab(df_filtrado['estado'], df_filtrado['acesso'])
         fig, ax = plt.subplots(figsize=(12, 6))
         cross_tab.plot(kind='bar', stacked=True, ax=ax, colormap='viridis')
@@ -108,9 +114,8 @@ else:
             ax.bar_label(c, label_type='center', fmt='%d', color='white', fontweight='bold')
         st.pyplot(fig)
 
-    with tab4:
+    elif menu == "📚 Por Turma e Estado":
         col1, col2 = st.columns(2)
-
         with col1:
             st.markdown("#### 📌 Percentual de Acesso por Estado")
             porcentagem_estado = (
@@ -126,7 +131,6 @@ else:
             for container in ax.containers:
                 ax.bar_label(container, fmt="%.1f%%", label_type="center")
             st.pyplot(fig)
-
         with col2:
             st.markdown("#### 🎓 Percentual de Acesso por Turma (ID Coorte)")
             porcentagem_turma = (
@@ -144,47 +148,53 @@ else:
                         st.markdown(f"- {status}: {valor:.1f}%")
                     st.markdown("---")
 
-    with tab5:
-       
+    elif menu == "📉 Menores Acessos":
         st.markdown("### 🏙️ Cidades com Maior % de 'Nunca Acessou'")
-
-        # Filtro por estado
         estados_disponiveis = sorted(df_filtrado['estado'].dropna().unique())
         estados_selecionados = st.multiselect("Selecione o(s) Estado(s):", estados_disponiveis, default=estados_disponiveis)
-
-        # Filtra o DataFrame com base nos estados selecionados
         df_estado_filtrado = df_filtrado[df_filtrado['estado'].isin(estados_selecionados)]
-
-        # Agrupamento por cidade, estado e acesso
         cidade_estado = df_estado_filtrado.groupby(['cidade', 'estado', 'acesso']).size().unstack(fill_value=0)
-
-        # Normalizando os nomes das colunas de acesso
         colunas = [col.lower() for col in cidade_estado.columns]
         cidade_estado.columns = colunas
-
-        # Pegando valores corretamente mesmo que falte alguma categoria
         ja_acessou = cidade_estado.get('já acessou', 0)
         nunca_acessou = cidade_estado.get('nunca acessou', 0)
-
-        # Cálculo das colunas
         cidade_estado['Já Acessou'] = ja_acessou
         cidade_estado['Nunca Acessou'] = nunca_acessou
         cidade_estado['Total de Registros'] = ja_acessou + nunca_acessou
         cidade_estado['% Nunca Acessou'] = (nunca_acessou / cidade_estado['Total de Registros']) * 100
-
-        # Organização final
         cidades_ordenadas = cidade_estado[['% Nunca Acessou', 'Já Acessou', 'Total de Registros']].sort_values(
-            by='% Nunca Acessou', ascending=False
-        ).reset_index()
-
-        cidades_ordenadas = cidades_ordenadas.rename(columns={
-            'cidade': 'Cidade',
-            'estado': 'Estado'
-        })
-
+            by='% Nunca Acessou', ascending=False).reset_index()
+        cidades_ordenadas = cidades_ordenadas.rename(columns={'cidade': 'Cidade', 'estado': 'Estado'})
         st.dataframe(cidades_ordenadas.head(100), use_container_width=True)
 
+    elif menu == "👥 Alocação por Turma":
+        st.markdown("### 👥 Turmas com Menos Alunos")
+        estado_turma = st.selectbox("Selecione o Estado:", sorted(df_filtrado['estado'].unique()))
+        cidades_do_estado = sorted(df_filtrado[df_filtrado['estado'] == estado_turma]['cidade'].unique())
+        cidade_turma = st.selectbox("Selecione a Cidade:", cidades_do_estado)
+        df_turma = df_filtrado[(df_filtrado['estado'] == estado_turma) & (df_filtrado['cidade'] == cidade_turma)]
+        turma_contagem = df_turma['id_coorte'].value_counts().sort_values()
+        st.write("Quantidade de alunos por turma:")
+        st.dataframe(turma_contagem.reset_index().rename(columns={"index": "Turma", "id_coorte": "Qtd de Alunos"}))
 
+    elif menu == "🔍 Buscar por Nome":
+        nome_busca = st.sidebar.text_input("🔍 Buscar Aluno por Nome (sem acentos ou caracteres especias)", placeholder="Digite o nome...", key="busca_nome")
+
+        if nome_busca:
+            nome_busca_lower = nome_busca.strip().lower()
+            resultados = df[df['nome'].str.lower().str.contains(nome_busca_lower)]
+            st.subheader("🔍 Resultado da Busca por Nome")
+            if resultados.empty:
+                st.warning("Nenhum aluno encontrado com esse nome.")
+            else:
+                for idx, linha in resultados.iterrows():
+                    st.markdown(f"""
+                    - **Nome:** {linha['nome']}
+                    - **Turma:** {linha['id_coorte']}
+                    - **Cidade:** {linha['cidade']}
+                    - **Estado:** {linha['estado']}
+                    ---
+                    """)
 
 
 
