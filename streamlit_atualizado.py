@@ -105,15 +105,47 @@ else:
         st.pyplot(fig)
 
     elif menu == "📈 Detalhado":
+        # Tabela cruzada com totais
         cross_tab = pd.crosstab(df_filtrado['estado'], df_filtrado['acesso'])
+        total_por_estado = cross_tab.sum(axis=1)
+        percentual = (cross_tab.T / total_por_estado).T * 100
+
         fig, ax = plt.subplots(figsize=(12, 6))
-        cross_tab.plot(kind='bar', stacked=True, ax=ax, colormap='viridis')
+        bars = cross_tab.plot(kind='bar', stacked=True, ax=ax, colormap='viridis')
+
         ax.set_title('Status de Acesso por Estado')
         ax.set_ylabel('Quantidade')
         ax.legend(title='Status', bbox_to_anchor=(1.05, 1))
-        for c in ax.containers:
-            ax.bar_label(c, label_type='center', fmt='%d', color='white', fontweight='bold')
+
+        acesso_labels = cross_tab.columns.tolist()  # ['Já Acessou', 'Nunca Acessou']
+        estados = cross_tab.index.tolist()
+
+        for i, container in enumerate(ax.containers):
+            tipo = acesso_labels[i] if i < len(acesso_labels) else None  # Pegamos o nome correto da coluna
+            for j, bar in enumerate(container):
+                height = bar.get_height()
+                if height > 0 and tipo:
+                    try:
+                        grupo_estado = estados[j]  # índice do estado
+                        qtd = int(height)
+                        perc = percentual.loc[grupo_estado, tipo]
+
+                        ax.text(
+                            bar.get_x() + bar.get_width() / 2,
+                            bar.get_y() + height / 2,
+                            f"{qtd} ({perc:.1f}%)",
+                            ha='center',
+                            va='center',
+                            color='white',
+                            fontsize=9,
+                            fontweight='bold'
+                        )
+                    except Exception as e:
+                        print(f"Erro ao adicionar rótulo: {e}")
+
         st.pyplot(fig)
+
+
 
     elif menu == "📚 Por Turma e Estado":
         col1, col2 = st.columns(2)
