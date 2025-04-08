@@ -11,7 +11,7 @@ sns.set_theme(style="whitegrid")
 try:
     arquivo_excel = 'Acessos_tratado.xlsx'
     df = pd.read_excel(arquivo_excel, sheet_name='Sheet1')
-    df.columns = ['nome', 'cidade', 'id_coorte', 'acesso', 'estado']
+    df.columns = ['nome', 'cidade', 'id_coorte', 'acesso', 'estado', 'ultimo_acesso']
 
     # Normalização
     df['estado'] = df['estado'].astype(str).str.upper().str.strip()
@@ -47,7 +47,9 @@ menu = st.sidebar.radio("📁 Navegação", [
     "📚 Por Turma e Estado", 
     "📉 Menores Acessos",
     "👥 Alocação por Turma", 
-    "🔍 Buscar por Nome"
+    "🔍 Buscar por Nome",
+    "📆 Andamento de Acessos",
+    "📆 Acompanhamento por Turma"  
 ])
 
 # Aplicar filtros
@@ -195,8 +197,102 @@ else:
                     - **Estado:** {linha['estado']}
                     ---
                     """)
+    
+    elif menu == "📆 Andamento de Acessos":
+        st.markdown("### 📆 Andamento de Acessos por Turma")
+
+        # Filtros específicos
+        estado_opcao = st.selectbox("Estado", sorted(df['estado'].dropna().unique()))
+        cidades_opcao = sorted(df[df['estado'] == estado_opcao]['cidade'].unique())
+        cidade_opcao = st.selectbox("Cidade", cidades_opcao)
+
+        turmas_disponiveis = sorted(df[(df['estado'] == estado_opcao) & (df['cidade'] == cidade_opcao)]['id_coorte'].unique())
+        turma_opcao = st.selectbox("Turma", turmas_disponiveis)
+
+        # Filtrando os dados
+        df_turma = df[
+            (df['estado'] == estado_opcao) &
+            (df['cidade'] == cidade_opcao) &
+            (df['id_coorte'] == turma_opcao)
+        ].copy()
+
+        # Converter coluna de data se ainda não estiver no formato datetime
+        df_turma['ultimo_acesso'] = pd.to_datetime(
+            df_turma['ultimo_acesso'], errors='coerce', dayfirst=True
+        )
+
+        # Filtrar apenas os que acessaram
+        df_acessos = df_turma[df_turma['acesso'] == 'já acessou']
+
+        if df_acessos.empty:
+            st.info("Nenhum acesso registrado para a turma selecionada.")
+        else:
+            # Contagem por dia
+            acessos_por_dia = df_acessos['ultimo_acesso'].dt.date.value_counts().sort_index()
+            fig, ax = plt.subplots(figsize=(10, 5))
+            acessos_por_dia.plot(kind='line', marker='o', ax=ax)
+            ax.set_title(f"Andamento de Acessos - {turma_opcao}")
+            ax.set_xlabel("Data")
+            ax.set_ylabel("Quantidade de Acessos")
+            ax.grid(True)
+            st.pyplot(fig)
+
+            # Detalhe adicional (opcional)
+            st.markdown("#### 📋 Acessos por Dia")
+            st.dataframe(acessos_por_dia.rename("Quantidade de Acessos").reset_index().rename(columns={'index': 'Data'}))
+    
+    elif menu == "📆 Acompanhamento por Turma":
+        st.markdown("### 📊 Evolução dos Acessos por Turma")
+
+        # Filtros
+        estado_filtro = st.selectbox("Selecione o Estado:", sorted(df_filtrado['estado'].unique()))
+        cidades_filtro = df_filtrado[df_filtrado['estado'] == estado_filtro]['cidade'].unique()
+        cidade_filtro = st.selectbox("Selecione a Cidade:", sorted(cidades_filtro))
+
+        turmas_disp = df_filtrado[
+            (df_filtrado['estado'] == estado_filtro) & 
+            (df_filtrado['cidade'] == cidade_filtro)
+        ]['id_coorte'].unique()
+
+        turma_filtro = st.selectbox("Selecione a Turma:", sorted(turmas_disp))
+
+        # Dados filtrados
+        df_turma = df_filtrado[
+            (df_filtrado['estado'] == estado_filtro) & 
+            (df_filtrado['cidade'] == cidade_filtro) & 
+            (df_filtrado['id_coorte'] == turma_filtro) &
+            (df_filtrado['acesso'].str.lower() == "já acessou")
+        ].copy()
+
+        if df_turma.empty:
+            st.warning("Nenhum acesso encontrado para essa turma.")
+        else:
+            # Garantir que a data esteja no formato correto
+            df_turma['ultimo_acesso'] = pd.to_datetime(df_turma['ultimo_acesso'], errors='coerce')
+
+            # Contar acessos por data
+            acessos_diarios = df_turma['ultimo_acesso'].dt.date.value_counts().sort_index()
+            acessos_acumulados = acessos_diarios.cumsum()
+
+            # Plotar gráfico
+            fig, ax = plt.subplots(figsize=(10, 5))
+            acessos_acumulados.plot(ax=ax, marker='o', linestyle='-')
+            ax.set_title(f"Evolução Acumulada de Acessos - Turma {turma_filtro}")
+            ax.set_xlabel("Data")
+            ax.set_ylabel("Total Acumulado de Acessos")
+            ax.grid(True)
+            st.pyplot(fig)
+
+            st.markdown("#### 📋 Evolução Diária")
+            st.dataframe(
+                pd.DataFrame({
+                    "Data": acessos_acumulados.index,
+                    "Acessos Acumulados": acessos_acumulados.values
+                })
+            )
 
 
+######################################################
 
     st.divider()
     st.subheader("📋 Dados Filtrados")
