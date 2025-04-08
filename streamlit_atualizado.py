@@ -111,7 +111,10 @@ else:
         percentual = (cross_tab.T / total_por_estado).T * 100
 
         fig, ax = plt.subplots(figsize=(12, 6))
-        bars = cross_tab.plot(kind='bar', stacked=True, ax=ax, colormap='viridis')
+        
+        # Definindo as cores para "Já Acessou" e "Nunca Acessou"
+        cores = ['#1f77b4', '#ff7f0e']  # Altere os códigos de cores conforme desejado
+        bars = cross_tab.plot(kind='bar', stacked=True, ax=ax, color=cores)
 
         ax.set_title('Status de Acesso por Estado')
         ax.set_ylabel('Quantidade')
@@ -121,7 +124,7 @@ else:
         estados = cross_tab.index.tolist()
 
         for i, container in enumerate(ax.containers):
-            tipo = acesso_labels[i] if i < len(acesso_labels) else None  # Pegamos o nome correto da coluna
+            tipo = acesso_labels[i] if i < len(acesso_labels) else None
             for j, bar in enumerate(container):
                 height = bar.get_height()
                 if height > 0 and tipo:
@@ -144,7 +147,6 @@ else:
                         print(f"Erro ao adicionar rótulo: {e}")
 
         st.pyplot(fig)
-
 
 
     elif menu == "📚 Por Turma e Estado":
