@@ -48,7 +48,6 @@ menu = st.sidebar.radio("📁 Navegação", [
     "📉 Menores Acessos",
     "👥 Alocação por Turma", 
     "🔍 Buscar por Nome",
-    "📆 Andamento de Acessos",
     "📆 Acompanhamento por Turma"  
 ])
 
@@ -197,49 +196,6 @@ else:
                     - **Estado:** {linha['estado']}
                     ---
                     """)
-    
-    elif menu == "📆 Andamento de Acessos":
-        st.markdown("### 📆 Andamento de Acessos por Turma")
-
-        # Filtros específicos
-        estado_opcao = st.selectbox("Estado", sorted(df['estado'].dropna().unique()))
-        cidades_opcao = sorted(df[df['estado'] == estado_opcao]['cidade'].unique())
-        cidade_opcao = st.selectbox("Cidade", cidades_opcao)
-
-        turmas_disponiveis = sorted(df[(df['estado'] == estado_opcao) & (df['cidade'] == cidade_opcao)]['id_coorte'].unique())
-        turma_opcao = st.selectbox("Turma", turmas_disponiveis)
-
-        # Filtrando os dados
-        df_turma = df[
-            (df['estado'] == estado_opcao) &
-            (df['cidade'] == cidade_opcao) &
-            (df['id_coorte'] == turma_opcao)
-        ].copy()
-
-        # Converter coluna de data se ainda não estiver no formato datetime
-        df_turma['ultimo_acesso'] = pd.to_datetime(
-            df_turma['ultimo_acesso'], errors='coerce', dayfirst=True
-        )
-
-        # Filtrar apenas os que acessaram
-        df_acessos = df_turma[df_turma['acesso'] == 'já acessou']
-
-        if df_acessos.empty:
-            st.info("Nenhum acesso registrado para a turma selecionada.")
-        else:
-            # Contagem por dia
-            acessos_por_dia = df_acessos['ultimo_acesso'].dt.date.value_counts().sort_index()
-            fig, ax = plt.subplots(figsize=(10, 5))
-            acessos_por_dia.plot(kind='line', marker='o', ax=ax)
-            ax.set_title(f"Andamento de Acessos - {turma_opcao}")
-            ax.set_xlabel("Data")
-            ax.set_ylabel("Quantidade de Acessos")
-            ax.grid(True)
-            st.pyplot(fig)
-
-            # Detalhe adicional (opcional)
-            st.markdown("#### 📋 Acessos por Dia")
-            st.dataframe(acessos_por_dia.rename("Quantidade de Acessos").reset_index().rename(columns={'index': 'Data'}))
     
     elif menu == "📆 Acompanhamento por Turma":
         st.markdown("### 📊 Evolução dos Acessos por Turma")
