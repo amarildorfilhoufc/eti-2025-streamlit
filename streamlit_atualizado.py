@@ -118,9 +118,14 @@ else:
 
         ax.set_title('Status de Acesso por Estado')
         ax.set_ylabel('Quantidade')
-        ax.legend(title='Status', bbox_to_anchor=(1.05, 1))
 
+        # Adiciona os totais ao lado dos nomes de status na legenda
         acesso_labels = cross_tab.columns.tolist()  # ['Já Acessou', 'Nunca Acessou']
+        acesso_totais = [cross_tab[col].sum() for col in acesso_labels]
+        legenda_labels = [f"{label} ({total})" for label, total in zip(acesso_labels, acesso_totais)]
+
+        ax.legend(title='Status', labels=legenda_labels, bbox_to_anchor=(1.05, 1))
+
         estados = cross_tab.index.tolist()
 
         for i, container in enumerate(ax.containers):
@@ -150,38 +155,121 @@ else:
 
 
     elif menu == "📚 Por Turma e Estado":
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### 📌 Percentual de Acesso por Estado")
-            porcentagem_estado = (
-                df_filtrado.groupby(['estado', 'acesso']).size()
-                .groupby(level=0).apply(lambda x: 100 * x / float(x.sum()))
-                .unstack().fillna(0)
-            )
-            fig, ax = plt.subplots(figsize=(10, 5))
-            porcentagem_estado.plot(kind='bar', stacked=True, ax=ax, colormap='Accent')
-            ax.set_ylabel('%')
-            ax.set_title('Distribuição Percentual por Estado')
-            ax.legend(title='Status de Acesso', bbox_to_anchor=(1.05, 1), loc='upper left')
-            for container in ax.containers:
-                ax.bar_label(container, fmt="%.1f%%", label_type="center")
-            st.pyplot(fig)
-        with col2:
-            st.markdown("#### 🎓 Percentual de Acesso por Turma (ID Coorte)")
-            porcentagem_turma = (
-                df_filtrado.groupby(['id_coorte', 'acesso']).size()
-                .groupby(level=0).apply(lambda x: 100 * x / float(x.sum()))
-                .unstack().fillna(0)
-                .round(1)
-            )
-            if porcentagem_turma.empty:
-                st.info("Nenhuma turma encontrada com os filtros aplicados.")
-            else:
-                for turma, linha in porcentagem_turma.iterrows():
-                    st.markdown(f"**Turma {turma}:**")
-                    for status, valor in linha.items():
-                        st.markdown(f"- {status}: {valor:.1f}%")
-                    st.markdown("---")
+        st.markdown("#### 📌 Percentual de Acesso por Estado")
+
+        if df_filtrado.empty:
+            st.warning("Nenhum dado encontrado com os filtros aplicados.")
+        else:
+            col1, col2 = st.columns(2)
+
+            with col1:
+                porcentagem_estado = (
+                    df_filtrado.groupby(['estado', 'acesso']).size()
+                    .groupby(level=0).apply(lambda x: 100 * x / float(x.sum()))
+                    .unstack().fillna(0)
+                )
+
+                fig, ax = plt.subplots(figsize=(10, 5))
+                porcentagem_estado.plot(kind='bar', stacked=True, ax=ax, colormap='Accent')
+                ax.set_ylabel('%')
+                ax.set_title('Distribuição Percentual por Estado')
+                ax.legend(title='Status de Acesso', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+                for container in ax.containers:
+                    ax.bar_label(container, fmt="%.1f%%", label_type="center")
+
+                st.pyplot(fig)
+
+        # Gráfico de acesso por turma em tela cheia
+        if df_filtrado.empty:
+            st.info("Nenhuma turma encontrada com os filtros aplicados.")
+        else:
+            st.markdown("#### 📊 Gráfico de Acesso por Turma")
+
+            contagem_turma = df_filtrado.groupby(['id_coorte', 'acesso']).size().unstack(fill_value=0)
+            porcentagem_turma = contagem_turma.div(contagem_turma.sum(axis=1), axis=0) * 100
+
+            contagem_turma.index = contagem_turma.index.astype(str)
+            porcentagem_turma.index = porcentagem_turma.index.astype(str)
+
+            fig2, ax2 = plt.subplots(figsize=(18, 7))  # ⬅️ AUMENTADO O TAMANHO
+            cores = ['#1f77b4', '#ff7f0e']
+            contagem_turma.plot(kind='bar', stacked=True, ax=ax2, color=cores)
+            ax2.set_ylabel('Quantidade')
+            ax2.set_title('Status de Acesso por Turma')
+            ax2.legend(title='Status', bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax2.set_xticklabels(contagem_turma.index, rotation=45, ha='right')  # ⬅️ ROTACIONA RÓTULOS
+
+            for i, container in enumerate(ax2.containers):
+                status = contagem_turma.columns[i]
+                for j, bar in enumerate(container):
+                    altura = bar.get_height()
+                    if altura > 0:
+                        turma = contagem_turma.index[j]
+                        perc = porcentagem_turma.loc[turma, status]
+                        texto = f"{int(altura)} ({perc:.1f}%)"
+                        if altura < 5:
+                            # Se a barra for muito pequena, mostra o rótulo acima
+                            ax2.text(
+                                bar.get_x() + bar.get_width() / 2,
+                                bar.get_y() + altura + 0.5,
+                                texto,
+                                ha='center', va='bottom',
+                                color='black', fontsize=8
+                            )
+                        else:
+                            # Senão, mostra dentro
+                            ax2.text(
+                                bar.get_x() + bar.get_width() / 2,
+                                bar.get_y() + altura / 2,
+                                texto,
+                                ha='center', va='center',
+                                color='white', fontsize=9, fontweight='bold'
+                            )
+
+            st.pyplot(fig2)
+
+                # Tabela detalhada por Estado e Turma
+        # Tabela detalhada por Estado e Turma com Percentuais
+        st.markdown("#### 📝 Detalhamento por Estado e Turma")
+
+        # Agrupar dados por estado, turma e acesso
+        detalhamento = (
+            df_filtrado.groupby(['estado', 'id_coorte', 'acesso'])
+            .size()
+            .unstack(fill_value=0)
+            .reset_index()
+            .rename(columns={
+                'já acessou': 'Já Acessou',
+                'nunca acessou': 'Nunca Acessou'
+            })
+        )
+
+        # Total por estado
+        totais_estado = df_filtrado.groupby(['estado', 'acesso']).size().unstack(fill_value=0)
+        totais_estado['% Já Acessou'] = (totais_estado['já acessou'] / totais_estado.sum(axis=1) * 100).round(1)
+
+        # Calcular % por turma
+        detalhamento['Total'] = detalhamento['Já Acessou'] + detalhamento['Nunca Acessou']
+        detalhamento['% Já Acessou'] = (detalhamento['Já Acessou'] / detalhamento['Total'] * 100).round(1)
+        detalhamento['% Nunca Acessou'] = (detalhamento['Nunca Acessou'] / detalhamento['Total'] * 100).round(1)
+
+        # Exibir dados por estado
+        estados = detalhamento['estado'].unique()
+        for estado in sorted(estados):
+            # Obter % total de acesso do estado
+            percentual_estado = totais_estado.loc[estado]['% Já Acessou']
+            st.markdown(f"### 📍 Estado: **{estado}** – Já Acessou: **{percentual_estado:.1f}%**")
+
+            # Filtrar dados do estado
+            df_estado = detalhamento[detalhamento['estado'] == estado][
+                ['id_coorte', 'Já Acessou', '% Já Acessou', 'Nunca Acessou', '% Nunca Acessou']
+            ]
+            df_estado = df_estado.rename(columns={'id_coorte': 'Turma'})
+            df_estado = df_estado.sort_values(by='Turma')
+
+            st.dataframe(df_estado.reset_index(drop=True), use_container_width=True)
+
 
     elif menu == "📉 Menores Acessos":
         st.markdown("### 🏙️ Cidades com Maior % de 'Nunca Acessou'")
