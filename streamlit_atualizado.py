@@ -119,10 +119,17 @@ else:
         ax.set_title('Status de Acesso por Estado')
         ax.set_ylabel('Quantidade')
 
-        # Adiciona os totais ao lado dos nomes de status na legenda
-        acesso_labels = cross_tab.columns.tolist()  # ['Já Acessou', 'Nunca Acessou']
+        acesso_labels = cross_tab.columns.tolist()
         acesso_totais = [cross_tab[col].sum() for col in acesso_labels]
-        legenda_labels = [f"{label} ({total})" for label, total in zip(acesso_labels, acesso_totais)]
+        total_geral = sum(acesso_totais)
+        acesso_percentuais = [(total / total_geral) * 100 for total in acesso_totais]
+
+        # Legenda com quantidade + percentual
+        legenda_labels = [
+            f"{label} ({total} – {percentual:.1f}%)"
+            for label, total, percentual in zip(acesso_labels, acesso_totais, acesso_percentuais)
+        ]
+
 
         ax.legend(title='Status', labels=legenda_labels, bbox_to_anchor=(1.05, 1))
 
