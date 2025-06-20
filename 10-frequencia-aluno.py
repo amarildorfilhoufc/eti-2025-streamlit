@@ -14,7 +14,7 @@ st.title("📚 Mapa de Presença por Curso")
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_excel("presencas.xlsx")
+        df = pd.read_excel("10-presencas.xlsx")
         required_cols = ['user_id', 'firstname', 'lastname', 'course_name', 'access_time']
         if not all(col in df.columns for col in required_cols):
             missing = [col for col in required_cols if col not in df.columns]
